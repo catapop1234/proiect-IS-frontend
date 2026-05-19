@@ -7,46 +7,83 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import BlobBackground from "@/components/BlobBackground";
+import { useAuth } from "@/app/providers";
+import { api } from "@/lib/api";
 import { Place } from "@/types";
-
-const API_BASE = "http://127.0.0.1:3099";
 
 const PRICE_LEVELS = ["$", "$$", "$$$", "$$$$", "$$$$$"];
 
 export default function DetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  
+  const { user } = useAuth();
+
   const [place, setPlace] = useState<Place | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [nearbyPlaces, setNearbyPlaces] = useState<any[]>([]);
+  const [nearbyType, setNearbyType] = useState("");
 
   useEffect(() => {
     const fetchPlace = async () => {
       setLoading(true);
-      setError(null);
-
       try {
-        const response = await fetch(`${API_BASE}/api/place/${id}`);
-        const data = await response.json();
-
+        const data = await api.placeDetails(id);
         if (data.error) {
           setError(data.error);
         } else {
           setPlace(data);
         }
-      } catch (err) {
+      } catch {
         setError("Failed to connect to server.");
-        console.error(err);
-      } finally {
-        setLoading(false);
       }
+      setLoading(false);
     };
-
     fetchPlace();
   }, [id]);
+
+  useEffect(() => {
+    if (user && place) {
+      api.favoriteStatus(id).then((d) => setIsFavorite(d.is_favorite));
+    }
+  }, [user, place, id]);
+
+  useEffect(() => {
+    if (user && place?.location) {
+      const current_type = place.types?.[0] || "hotel";
+      api.nearby({ lat: place.location.lat, lng: place.location.lng, current_type }).then((data) => {
+        if (data.results) {
+          setNearbyPlaces(data.results);
+          setNearbyType(data.type || "");
+        }
+      });
+    }
+  }, [user, place]);
+
+  const handleFavorite = async () => {
+    if (!user || !place) return;
+    if (isFavorite) {
+      await api.removeFavorite(id);
+      setIsFavorite(false);
+    } else {
+      await api.addFavorite({
+        place_id: place.place_id,
+        name: place.name,
+        address: place.address,
+        rating: place.rating,
+        price_level: place.price_level,
+        photos: place.photos,
+        geometry: place.geometry,
+        website: place.website,
+        formatted_phone_number: place.formatted_phone_number,
+        place_type: place.types?.[0] || "",
+      });
+      setIsFavorite(true);
+    }
+  };
 
   const handleImageError = (photoRef: string) => {
     setImageErrors((prev) => new Set(prev).add(photoRef));
@@ -74,7 +111,7 @@ export default function DetailPage({ params }: { params: Promise<{ id: string }>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to results
+            Back
           </motion.button>
 
           {loading ? (
@@ -87,32 +124,17 @@ export default function DetailPage({ params }: { params: Promise<{ id: string }>
               </div>
             </div>
           ) : error ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="card p-8 text-center"
-            >
-              <svg
-                className="w-16 h-16 mx-auto mb-4 text-red-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card p-8 text-center">
+              <svg className="w-16 h-16 mx-auto mb-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <h2 className="text-xl font-semibold mb-2">Oops! Something went wrong</h2>
               <p className="text-[var(--text-secondary)]">{error}</p>
-              <Link href="/" className="btn-primary inline-block mt-4">
-                Go Home
-              </Link>
+              <Link href="/" className="btn-primary inline-block mt-4">Go Home</Link>
             </motion.div>
           ) : place ? (
             <>
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="card overflow-hidden"
-              >
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card overflow-hidden">
                 <div className="relative h-80 md:h-96 bg-[var(--bg-tertiary)]">
                   <AnimatePresence mode="wait">
                     {currentPhotoUrl ? (
@@ -128,28 +150,36 @@ export default function DetailPage({ params }: { params: Promise<{ id: string }>
                         onError={() => handleImageError(currentPhoto.photo_reference)}
                       />
                     ) : (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                         className="w-full h-full flex items-center justify-center"
                       >
-                        <svg
-                          className="w-24 h-24 text-[var(--text-muted)]"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
+                        <svg className="w-24 h-24 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                       </motion.div>
                     )}
                   </AnimatePresence>
-
                   {place.price_level && (
                     <div className="absolute bottom-4 left-4 px-4 py-2 rounded-xl bg-black/70 backdrop-blur-sm text-white text-lg font-medium">
                       {PRICE_LEVELS[place.price_level - 1] || "$"}
                     </div>
+                  )}
+                  {user && (
+                    <motion.button
+                      onClick={handleFavorite}
+                      className="absolute top-4 right-4 w-11 h-11 rounded-xl bg-black/60 backdrop-blur-sm flex items-center justify-center cursor-pointer"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      <svg
+                        className={`w-6 h-6 ${isFavorite ? "text-red-500 fill-red-500" : "text-white"}`}
+                        fill={isFavorite ? "currentColor" : "none"}
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                    </motion.button>
                   )}
                 </div>
 
@@ -160,32 +190,20 @@ export default function DetailPage({ params }: { params: Promise<{ id: string }>
                         key={photo.photo_reference}
                         onClick={() => setSelectedPhotoIndex(index)}
                         className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
-                          index === selectedPhotoIndex
-                            ? "border-[var(--accent-primary)]"
-                            : "border-transparent opacity-60 hover:opacity-100"
+                          index === selectedPhotoIndex ? "border-[var(--accent-primary)]" : "border-transparent opacity-60 hover:opacity-100"
                         }`}
                       >
-                        <img
-                          src={`/api/photo?reference=${photo.photo_reference}&max_width=100`}
-                          alt={`Photo ${index + 1}`}
-                          className="w-full h-full object-cover"
-                          onError={() => handleImageError(photo.photo_reference)}
-                        />
+                        <img src={api.photo(photo.photo_reference, 100)} alt="" className="w-full h-full object-cover"
+                          onError={() => handleImageError(photo.photo_reference)} />
                       </button>
                     ))}
                   </div>
                 )}
               </motion.div>
 
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="mt-8 space-y-6"
-              >
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mt-8 space-y-6">
                 <div>
                   <h1 className="text-3xl md:text-4xl font-bold mb-3">{place.name}</h1>
-                  
                   {place.address && (
                     <p className="text-lg text-[var(--text-secondary)] flex items-start gap-2">
                       <svg className="w-5 h-5 mt-1 flex-shrink-0 text-[var(--accent-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -199,28 +217,15 @@ export default function DetailPage({ params }: { params: Promise<{ id: string }>
 
                 {place.rating && (
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1">
-                      <span className="text-2xl font-bold">{place.rating.toFixed(1)}</span>
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-5 h-5 ${
-                              i < Math.round(place.rating || 0)
-                                ? "text-yellow-500"
-                                : "text-[var(--text-muted)]"
-                            }`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
+                    <span className="text-2xl font-bold">{place.rating.toFixed(1)}</span>
+                    <div className="flex">
+                      {[...Array(5)].map((_, i) => (
+                        <svg key={i} className={`w-5 h-5 ${i < Math.round(place.rating || 0) ? "text-yellow-500" : "text-[var(--text-muted)]"}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      ))}
                     </div>
-                    <span className="text-[var(--text-secondary)]">
-                      ({place.user_ratings_total} reviews)
-                    </span>
+                    <span className="text-[var(--text-secondary)]">({place.user_ratings_total} reviews)</span>
                   </div>
                 )}
 
@@ -232,22 +237,17 @@ export default function DetailPage({ params }: { params: Promise<{ id: string }>
                       </svg>
                       Opening Hours
                     </h2>
-                    <ul className="space-y-2">
-                      {place.opening_hours_weekday_text.map((hours, index) => (
-                        <li key={index} className="text-[var(--text-secondary)]">
-                          {hours}
-                        </li>
+                    <div className="space-y-1">
+                      {place.opening_hours_weekday_text.map((h, i) => (
+                        <p key={i} className="text-[var(--text-secondary)]">{h}</p>
                       ))}
-                    </ul>
+                    </div>
                   </div>
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {place.formatted_phone_number && (
-                    <a
-                      href={`tel:${place.formatted_phone_number}`}
-                      className="card p-5 flex items-center gap-4 hover:border-[var(--accent-primary)] transition-colors"
-                    >
+                    <a href={`tel:${place.formatted_phone_number}`} className="card p-5 flex items-center gap-4 hover:border-[var(--accent-primary)] transition-colors">
                       <div className="w-12 h-12 rounded-xl bg-[var(--accent-primary)]/10 flex items-center justify-center">
                         <svg className="w-6 h-6 text-[var(--accent-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -259,14 +259,8 @@ export default function DetailPage({ params }: { params: Promise<{ id: string }>
                       </div>
                     </a>
                   )}
-
                   {place.website && (
-                    <a
-                      href={place.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="card p-5 flex items-center gap-4 hover:border-[var(--accent-primary)] transition-colors"
-                    >
+                    <a href={place.website} target="_blank" rel="noopener noreferrer" className="card p-5 flex items-center gap-4 hover:border-[var(--accent-primary)] transition-colors">
                       <div className="w-12 h-12 rounded-xl bg-[var(--accent-primary)]/10 flex items-center justify-center">
                         <svg className="w-6 h-6 text-[var(--accent-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
@@ -278,14 +272,8 @@ export default function DetailPage({ params }: { params: Promise<{ id: string }>
                       </div>
                     </a>
                   )}
-
                   {place.url && (
-                    <a
-                      href={place.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="card p-5 flex items-center gap-4 hover:border-[var(--accent-primary)] transition-colors"
-                    >
+                    <a href={place.url} target="_blank" rel="noopener noreferrer" className="card p-5 flex items-center gap-4 hover:border-[var(--accent-primary)] transition-colors">
                       <div className="w-12 h-12 rounded-xl bg-[var(--accent-primary)]/10 flex items-center justify-center">
                         <svg className="w-6 h-6 text-[var(--accent-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -300,6 +288,59 @@ export default function DetailPage({ params }: { params: Promise<{ id: string }>
                   )}
                 </div>
               </motion.div>
+
+              {user && nearbyPlaces.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="mt-10 p-8 rounded-2xl relative overflow-hidden"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(236,72,153,0.15) 100%)",
+                    border: "1px solid rgba(99,102,241,0.2)",
+                  }}
+                >
+                  <h2 className="text-xl font-bold gradient-text mb-6">
+                    Nearby {nearbyType.replace("_", " ")}
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {nearbyPlaces.slice(0, 6).map((p: any, idx: number) => (
+                      <Link key={p.place_id} href={`/place/${p.place_id}`}>
+                        <motion.div
+                          className="card overflow-hidden cursor-pointer group"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: idx * 0.05 }}
+                          whileHover={{ y: -4 }}
+                        >
+                          <div className="relative h-32 bg-[var(--bg-tertiary)]">
+                            {p.photos?.[0]?.photo_reference ? (
+                              <img src={api.photo(p.photos[0].photo_reference, 300)} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <svg className="w-10 h-10 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-4">
+                            <h3 className="font-semibold text-sm line-clamp-1">{p.name}</h3>
+                            {p.rating && (
+                              <div className="flex items-center gap-1 mt-1">
+                                <svg className="w-3.5 h-3.5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                </svg>
+                                <span className="text-xs font-medium">{p.rating.toFixed(1)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      </Link>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
             </>
           ) : null}
         </div>

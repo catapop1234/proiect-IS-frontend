@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { ThemeProvider } from "./providers";
+import { ThemeProvider, AuthProvider } from "./providers";
 
 export const metadata: Metadata = {
   title: "ExploreHub - Hotels, Restaurants & Attractions",
@@ -15,7 +15,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
