@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE = "http://127.0.0.1:3099";
+const API_BASE = "https://api.crazyrap.win"
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);

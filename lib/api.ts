@@ -1,4 +1,4 @@
-const API_BASE = "http://127.0.0.1:3099";
+const API_BASE = "https://api.crazyrap.win";
 
 async function request(path: string, options: RequestInit = {}) {
   const token = localStorage.getItem("auth_token");
