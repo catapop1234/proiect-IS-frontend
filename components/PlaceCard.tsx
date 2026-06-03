@@ -10,9 +10,10 @@ const PRICE_LEVELS = ["$", "$$", "$$$", "$$$$", "$$$$$"];
 interface PlaceCardProps {
   place: Place;
   index: number;
+  from?: string;
 }
 
-export default function PlaceCard({ place, index }: PlaceCardProps) {
+export default function PlaceCard({ place, index, from }: PlaceCardProps) {
   const [imageError, setImageError] = useState(false);
   
   const photoRef = place.photos?.[0]?.photo_reference;
@@ -26,7 +27,7 @@ export default function PlaceCard({ place, index }: PlaceCardProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.05 }}
     >
-      <Link href={`/place/${place.place_id}`}>
+      <Link href={`/place/${place.place_id}${from ? `?from=${from}` : ""}`}>
         <article className="card overflow-hidden cursor-pointer h-full flex flex-col">
           <div className="relative h-48 bg-[var(--bg-tertiary)] overflow-hidden">
             {imageUrl && !imageError ? (

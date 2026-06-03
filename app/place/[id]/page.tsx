@@ -3,10 +3,11 @@
 import { use } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import BlobBackground from "@/components/BlobBackground";
+import AuthModal from "@/components/AuthModal";
 import { useAuth } from "@/app/providers";
 import { api } from "@/lib/api";
 import { Place } from "@/types";
@@ -16,6 +17,8 @@ const PRICE_LEVELS = ["$", "$$", "$$$", "$$$$", "$$$$$"];
 export default function DetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromCategory = searchParams.get("from");
   const { user } = useAuth();
 
   const [place, setPlace] = useState<Place | null>(null);
@@ -26,6 +29,7 @@ export default function DetailPage({ params }: { params: Promise<{ id: string }>
   const [isFavorite, setIsFavorite] = useState(false);
   const [nearbyPlaces, setNearbyPlaces] = useState<any[]>([]);
   const [nearbyType, setNearbyType] = useState("");
+  const [showAuth, setShowAuth] = useState(false);
 
   useEffect(() => {
     const fetchPlace = async () => {
@@ -64,7 +68,11 @@ export default function DetailPage({ params }: { params: Promise<{ id: string }>
   }, [user, place]);
 
   const handleFavorite = async () => {
-    if (!user || !place) return;
+    if (!user) {
+      setShowAuth(true);
+      return;
+    }
+    if (!place) return;
     if (isFavorite) {
       await api.removeFavorite(id);
       setIsFavorite(false);
@@ -79,7 +87,7 @@ export default function DetailPage({ params }: { params: Promise<{ id: string }>
         geometry: place.geometry,
         website: place.website,
         formatted_phone_number: place.formatted_phone_number,
-        place_type: place.types?.[0] || "",
+        place_type: fromCategory || place.place_type || "",
       });
       setIsFavorite(true);
     }
@@ -164,23 +172,21 @@ export default function DetailPage({ params }: { params: Promise<{ id: string }>
                       {PRICE_LEVELS[place.price_level - 1] || "$"}
                     </div>
                   )}
-                  {user && (
-                    <motion.button
-                      onClick={handleFavorite}
-                      className="absolute top-4 right-4 w-11 h-11 rounded-xl bg-black/60 backdrop-blur-sm flex items-center justify-center cursor-pointer"
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
+                  <motion.button
+                    onClick={handleFavorite}
+                    className="absolute top-4 right-4 w-11 h-11 rounded-xl bg-black/60 backdrop-blur-sm flex items-center justify-center cursor-pointer"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    <svg
+                      className={`w-6 h-6 ${isFavorite ? "text-red-500 fill-red-500" : "text-white"}`}
+                      fill={isFavorite ? "currentColor" : "none"}
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      <svg
-                        className={`w-6 h-6 ${isFavorite ? "text-red-500 fill-red-500" : "text-white"}`}
-                        fill={isFavorite ? "currentColor" : "none"}
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                      </svg>
-                    </motion.button>
-                  )}
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                  </motion.button>
                 </div>
 
                 {photos.length > 1 && (
@@ -345,6 +351,7 @@ export default function DetailPage({ params }: { params: Promise<{ id: string }>
           ) : null}
         </div>
       </div>
+      <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} />
     </main>
   );
 }

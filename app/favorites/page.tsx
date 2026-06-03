@@ -51,11 +51,14 @@ export default function FavoritesPage() {
 
   const fetchFavorites = useCallback(async () => {
     setLoading(true);
-    const type = filter === "all" ? undefined : filter;
-    const data = await api.getFavorites(type);
+    const data = await api.getFavorites();
     setFavorites(data.items || []);
     setLoading(false);
-  }, [filter]);
+  }, []);
+
+  const filteredFavorites = filter === "all"
+    ? favorites
+    : favorites.filter((f) => f.place_type === filter);
 
   useEffect(() => {
     if (user) fetchFavorites();
@@ -69,7 +72,7 @@ export default function FavoritesPage() {
   if (authLoading || !user) return null;
 
   const timelineGroups: Record<string, FavoriteItem[]> = {};
-  favorites.forEach((fav) => {
+  filteredFavorites.forEach((fav) => {
     const date = fav.created ? new Date(fav.created).toLocaleDateString("en-US", {
       year: "numeric", month: "long", day: "numeric",
     }) : "Unknown";
@@ -153,7 +156,7 @@ export default function FavoritesPage() {
                 </div>
               ))}
             </div>
-          ) : favorites.length === 0 ? (
+          ) : filteredFavorites.length === 0 ? (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card p-12 text-center">
               <svg className="w-16 h-16 mx-auto mb-4 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -165,7 +168,7 @@ export default function FavoritesPage() {
           ) : viewMode === "grid" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <AnimatePresence>
-                {favorites.map((fav, idx) => (
+                {filteredFavorites.map((fav, idx) => (
                   <motion.div
                     key={fav.place_id}
                     initial={{ opacity: 0, y: 20 }}

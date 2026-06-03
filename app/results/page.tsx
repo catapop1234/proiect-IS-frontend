@@ -110,7 +110,7 @@ export default function ResultsPage({ searchParams }: { searchParams: Promise<{ 
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {displayedPlaces.map((place, index) => (
-                  <PlaceCard key={place.place_id} place={place} index={index} />
+                  <PlaceCard key={place.place_id} place={place} index={index} from={type} />
                 ))}
               </div>
               {hasMore && (

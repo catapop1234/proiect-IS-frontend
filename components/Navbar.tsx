@@ -24,7 +24,7 @@ export default function Navbar() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
-            <span className="text-xl font-bold gradient-text">ExploreHub</span>
+            <span className="text-xl font-bold gradient-text">RoVac</span>
           </Link>
 
           <div className="flex items-center gap-3">

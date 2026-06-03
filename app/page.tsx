@@ -225,7 +225,7 @@ export default function SearchPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {recommendations.map((place: any, idx: number) => (
-                    <Link key={place.place_id} href={`/place/${place.place_id}`}>
+                    <Link key={place.place_id} href={`/place/${place.place_id}${place.place_type ? `?from=${place.place_type}` : ""}`}>
                       <motion.div
                         className="card overflow-hidden cursor-pointer group"
                         initial={{ opacity: 0, y: 10 }}

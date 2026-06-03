@@ -29,6 +29,7 @@ export interface Place {
   website?: string;
   formatted_phone_number?: string;
   url?: string;
+  place_type?: string;
   types?: string[];
   opening_hours_weekday_text?: string[];
 }
